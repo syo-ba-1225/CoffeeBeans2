@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+    .question-title {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1.2rem;
+    }
+    .coffee-name {
+      color: #555;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+    .choices button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.15s, transform 0.05s, box-shadow 0.05s;
+    }
+    .choices button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .choices button.correct {
+      background: #d4edda;
+      border-color: #78c28a;
+    }
+    .choices button.wrong {
+      background: #f8d7da;
+      border-color: #e39ba3;
+    }
+    .choices button:disabled {
+      cursor: default;
+      opacity: 0.9;
+      box-shadow: none;
+      transform: none;
+    }
+    .result {
+      margin-top: 12px;
+      font-weight: bold;
+    }
+    .result.correct {
+      color: #155724;
+    }
+    .result.wrong {
+      color: #721c24;
+    }
+    .controls {
+      text-align: center;
+      margin-top: 16px;
+    }
+    .controls button {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      background: #006241;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .controls button:hover {
+      opacity: 0.9;
+    }
+    .top-controls {
+      text-align: center;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+    select {
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .stats {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="subtitle">
+    （地域 / 加工法 / キーワード / コク酸味 / ペアリング / ロースト）
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="top-controls">
+    出題する項目：
+    <select id="attribute-select">
+      <option value="random">ランダム</option>
+      <option value="region">地域</option>
+      <option value="process">加工法</option>
+      <option value="keywords">キーワード</option>
+      <option value="body_acidity">コク/酸味</option>
+      <option value="pairing">相性のいい風味</option>
+      <option value="roast">ローストレベル</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2 class="question-title" id="question-text"></h2>
+    <div class="coffee-name" id="coffee-name"></div>
+    <div class="choices" id="choices"></div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <div class="controls">
+    <button id="next-btn">次の問題へ</button>
+  </div>
+
+  <script>
+    // ======== ここに CSV の中身を JS 配列として直接書く ========
+    // CSV の列順：
+    // 0: コーヒー名, 1: 地域, 2: 加工法, 3: キーワード,
+    // 4: コク/酸味, 5: 相性のいい風味, 6: ロースト
+    
+  const BEANS = [
+  {
+    "name": "ライトノートブレンド",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "軽めのコクとミルクチョコレートのような風味",
+    "body_acidity": "Light/Medium",
+    "pairing": "ミルクチョコレート・煎ったナッツ",
+    "roast": "BLONDE"
+  },
+  {
+    "name": "ブロンドエスプレッソロースト",
+    "region": "ラテンアメリカ/アフリカ",
+    "process": "水洗式",
+    "keywords": "キャンディードアップルやチョコレートを思わせる甘みのある風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "レモン・オレンジ・キャラメル",
+    "roast": "BLONDE"
+  },
+  {
+    "name": "ブレックファーストブレンド",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "１日のはじまりにふさわしいシトラスを思わせる風味",
+    "body_acidity": "Medium/High",
+    "pairing": "ナッツ・リンゴ・ブルーベリー・レモン",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "サイレンブレンド",
+    "region": "ラテンアメリカ/アフリカ",
+    "process": "水洗式",
+    "keywords": "シトラスを感じる調和のとれた味わい",
+    "body_acidity": "Medium/Medium",
+    "pairing": "キャンディードシトラス・チョコレート",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "ケニア",
+    "region": "アフリカ",
+    "process": "水洗式",
+    "keywords": "グレープフルーツやブラックカラントを思わせる風味",
+    "body_acidity": "Medium/High",
+    "pairing": "グレープフルーツ・ベリー類・カラント（スグリ）",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "パイクプレイスロースト",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "ほのかな香ばしさとなめらかな口あたり",
+    "body_acidity": "Medium/Medium",
+    "pairing": "ナッツ・チョコレート・シナモン",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "グアテマラアンティグア",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "ココアやスパイスを思わせる洗練された風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "チョコレート・ナッツ・キャラメル・リンゴ",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "エチオピア",
+    "region": "アフリカ",
+    "process": "水洗式",
+    "keywords": "シトラスやスパイスを思わせる優雅な味わい",
+    "body_acidity": "Medium/High",
+    "pairing": "ダークチョコレート・スイートシトラス",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "ハウスブレンド",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "ナッツやココアを思わせるバランスの取れた味わい",
+    "body_acidity": "Medium/Medium",
+    "pairing": "ナッツ・リンゴ・ブルーベリー",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "コロンビア",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "クルミを思わせる香ばしさとハーブのような風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "ミルクチョコレート・ピーカンナッツ",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "TOKYOロースト",
+    "region": "アジア/太平洋・ラテンアメリカ",
+    "process": "水洗式・半水洗式",
+    "keywords": "まろやかで心温まる味わい",
+    "body_acidity": "Medium/Medium",
+    "pairing": "シナモン・レーズン・オートミール・チョコレート",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "コールドブリューブレンド",
+    "region": "ラテンアメリカ・アフリカ",
+    "process": "水洗式",
+    "keywords": "Citrus&Sweet Chocolate",
+    "body_acidity": "Full/Low",
+    "pairing": "シトラス・ナッツ・ココア",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "スマトラ",
+    "region": "アジア/太平洋",
+    "process": "半水洗式",
+    "keywords": "大地を思わせる風味をしっかりとしたコク",
+    "body_acidity": "Full/Low",
+    "pairing": "シナモン・オートミール・メープル・バター・トフィー・チーズ",
+    "roast": "DARK"
+  },
+  {
+    "name": "コモドドラゴンブレンド",
+    "region": "アジア/太平洋",
+    "process": "水洗式・半水洗式",
+    "keywords": "フレッシュなハーブの風味とスパイシーな余韻",
+    "body_acidity": "Full/Low",
+    "pairing": "シナモン・メープル・バター・チーズ・ハーブ",
+    "roast": "DARK"
+  },
+  {
+    "name": "カフェベロナ",
+    "region": "ラテンアメリカ・アジア/太平洋",
+    "process": "水洗式・半水洗式",
+    "keywords": "ダークココアのような風味とローストの甘みと深み",
+    "body_acidity": "Full/Low",
+    "pairing": "ミルクチョコレート・ダークチョコレート・カラメル",
+    "roast": "DARK"
+  },
+  {
+    "name": "エスプレッソロースト",
+    "region": "ラテンアメリカ/アジア・太平洋",
+    "process": "水洗式・半水洗式",
+    "keywords": "豊かな風味とキャラメルのような甘み",
+    "body_acidity": "Full/Medium",
+    "pairing": "キャラメル・チョコレート・スパイス・ナッツ",
+    "roast": "DARK"
+  },
+  {
+    "name": "イタリアンロースト",
+    "region": "その時で異なる",
+    "process": "水洗式・半水洗式",
+    "keywords": "ロースト感のある甘みとカラメルのような風味",
+    "body_acidity": "Medium/Low",
+    "pairing": "ダークチョコレート・カラメル・スパイス",
+    "roast": "DARK"
+  },
+  {
+    "name": "フレンチロースト",
+    "region": "その時で異なる",
+    "process": "その時で異なる",
+    "keywords": "スモーキーと個性的で力強い風味",
+    "body_acidity": "Light/Low",
+    "pairing": "煎ったナッツ・ローストした野菜・カラメル",
+    "roast": "DARK"
+  },
+  {
+    "name": "グアテマラカシシエロ",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "メイヤーレモンとカカオニブを思わせる風味",
+    "body_acidity": "Medium/High",
+    "pairing": "チョコレート・シトラス・ナッツ・ソフトチーズ",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "エイジドスマトラ",
+    "region": "アジア/太平洋",
+    "process": "半水洗式",
+    "keywords": "バニラビーンズやオークを思わせる風味",
+    "body_acidity": "Medium/High",
+    "pairing": "チーズ・スパイス・セージ",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "スプリングシーズンブレンド",
+    "region": "インドネシア・パプアニューギニア・その他",
+    "process": "水洗式・半水洗式・乾燥式",
+    "keywords": "ハニーブッシュやココアを思わせる風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "さくら・チョコレート",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "トリビュートブレンド",
+    "region": "コロンビア・パプアニューギニア・インドネシア・エチオピア",
+    "process": "水洗式・半水洗式・乾燥式",
+    "keywords": "ブラックチェリーやベーキングスパイスを思わせる風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "ハーブ・チョコレート・ベリー",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "サンドライドタンザニアトゥンダ",
+    "region": "アフリカ",
+    "process": "乾燥式",
+    "keywords": "ベリーやライムを思わせる繊細な風味",
+    "body_acidity": "Medium/High",
+    "pairing": "ベリー・アップル・ジンジャー",
+    "roast": "BLONDE"
+  },
+  {
+    "name": "アイスコーヒーブレンド",
+    "region": "ラテンアメリカ・アフリカ",
+    "process": "水洗式",
+    "keywords": "シトラスやキャラメルを思わせる風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "レモン・オレンジ・ナッツ",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "コロンビアナリニョ",
+    "region": "ラテンアメリカ",
+    "process": "水洗式",
+    "keywords": "ヘーゼルナッツやココアのような風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "キャラメル・アプリコット",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "カティカティブレンド",
+    "region": "アフリカ（エチオピア/ケニア）",
+    "process": "水洗式・乾燥式",
+    "keywords": "グレープフルーツや赤いベリーを思わせる風味",
+    "body_acidity": "Medium/High",
+    "pairing": "シトラス・さとうきび・ミルクチョコレート",
+    "roast": "BLONDE"
+  },
+  {
+    "name": "ティモール　レステエルメラ",
+    "region": "アジア/太平洋",
+    "process": "水洗式",
+    "keywords": "ドライハーブやモルトを思わせる風味",
+    "body_acidity": "Medium/Low",
+    "pairing": "チョコレート・ソフトチーズ・マジパン",
+    "roast": "DARK"
+  },
+  {
+    "name": "ボヤージュブレンド",
+    "region": "東ティモール・ウガンダ・コロンビア",
+    "process": "水洗式",
+    "keywords": "オレンジやはちみつを思わせる風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "シトラス・ナッツ・ハーブ",
+    "roast": "MEDIUM"
+  },
+  {
+    "name": "オータムブレンド",
+    "region": "インドネシア・エチオピア・グアテマラ",
+    "process": "水洗式・半水洗式",
+    "keywords": "キャンディードビーカンやハーブを思わせる風味",
+    "body_acidity": "Full/Medium",
+    "pairing": "チーズ・ウォームスパイス・ハーブ",
+    "roast": "DARK"
+  },
+  {
+    "name": "アニバーサリーブレンド",
+    "region": "アジア/太平洋",
+    "process": "半水洗式",
+    "keywords": "ブラックトリュフやハーブ、スパイスのような風味",
+    "body_acidity": "Full/Low",
+    "pairing": "ペッパー・チーズ・チョコレート",
+    "roast": "DARK"
+  },
+  {
+    "name": "スマトラドゥアカリ",
+    "region": "アジア/太平洋",
+    "process": "半水洗式",
+    "keywords": "イチジクや摘みたてのハーブを思わせる風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "ハーブ・ストーンフルーツ・シトラス",
+    "roast": "BLONDE"
+  },
+  {
+    "name": "クリスマスブレンド",
+    "region": "ラテンアメリカ・アジア/太平洋",
+    "process": "水洗式・半水洗式",
+    "keywords": "スパイスの効いたチョコレートやスプルースの新芽を思わせるハーブの風味",
+    "body_acidity": "Full/Low",
+    "pairing": "ジンジャー・カスタード・ドライフルーツ",
+    "roast": "DARK"
+  },
+  {
+    "name": "クリスマスブレンドブロンドロースト",
+    "region": "アフリカ・アジア/太平洋",
+    "process": "水洗式・半水洗式・乾燥式",
+    "keywords": "オレンジやスパイス、イチジクのコンポートを思わせる風味",
+    "body_acidity": "Light/High",
+    "pairing": "シトラス・ベリークランブル",
+    "roast": "BLONDE"
+  },
+  {
+    "name": "クリスマスブレンドエスプレッソロースト",
+    "region": "アジア/太平洋・アフリカ",
+    "process": "水洗式・半水洗式・乾燥式",
+    "keywords": "シュガープラムやスモークしたバニラを思わせる風味",
+    "body_acidity": "Full/Low",
+    "pairing": "ダークチョコレート・ベーキングスパイス",
+    "roast": "DARK"
+  },
+  {
+    "name": "ディカフェホリデーブレンド",
+    "region": "ラテンアメリカ・アジア/太平洋",
+    "process": "水洗式・半水洗式",
+    "keywords": "メープルやハーブを思わせる風味",
+    "body_acidity": "Medium/Medium",
+    "pairing": "チーズ・シナモン・アップル",
+    "roast": "MEDIUM"
+  }
+    ];
+
+    const ATTRIBUTE_KEYS = [
+      "region",
+      "process",
+      "keywords",
+      "body_acidity",
+      "pairing",
+      "roast",
+    ];
+
+    const QUESTION_TEMPLATES = {
+      region: (name) => `${name} の生産地域は？`,
+      process: (name) => `${name} の主な加工法は？`,
+      keywords: (name) => `${name} のキーワード（テイスティングノート）は？`,
+      body_acidity: (name) => `${name} のコク/酸味バランスは？`,
+      pairing: (name) => `${name} と相性のいい風味は？`,
+      roast: (name) => `${name} のローストレベルは？`,
+    };
+
+    const questionTextEl = document.getElementById("question-text");
+    const coffeeNameEl = document.getElementById("coffee-name");
+    const choicesEl = document.getElementById("choices");
+    const resultEl = document.getElementById("result");
+    const nextBtn = document.getElementById("next-btn");
+    const attrSelect = document.getElementById("attribute-select");
+    const statsEl = document.getElementById("stats");
+
+    let currentQuestion = null;
+    let answered = false;
+    let correctCount = 0;
+    let totalCount = 0;
+
+    // ======== ユーティリティ ========
+    function shuffle(array) {
+      const arr = array.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function randomChoice(array) {
+      return array[Math.floor(Math.random() * array.length)];
+    }
+
+    // ======== 問題生成ロジック ========
+    function generateQuestion(attribute) {
+      if (!BEANS || BEANS.length === 0) {
+        throw new Error("BEANS が空です。CSV 由来のデータを BEANS に追加してください。");
+      }
+
+      const attr = attribute || randomChoice(ATTRIBUTE_KEYS);
+
+      const candidates = BEANS.filter((b) => {
+        const value = b[attr];
+        return value !== undefined && value !== null && String(value).trim() !== "";
+      });
+      if (candidates.length === 0) {
+        throw new Error("属性 " + attr + " に対応する豆がありません。");
+      }
+
+      const bean = randomChoice(candidates);
+      const correctValue = String(bean[attr]).trim();
+
+      let choices;
+      if (attr === "roast") {
+        // ローストレベルは 3択固定（BLONDE / MEDIUM / DARK のユニーク値）
+        const allRoasts = Array.from(
+          new Set(
+            BEANS
+              .map((b) => b.roast)
+              .filter((v) => v && String(v).trim() !== "")
+              .map((v) => String(v).trim())
+          )
+        );
+        const others = allRoasts.filter((v) => v !== correctValue);
+        const wrong = shuffle(others).slice(0, 2);
+        choices = shuffle([correctValue, ...wrong]);
+      } else {
+        // 地域 / 加工法 / キーワード / コク酸味 / ペアリング
+        // → 値ベースでユニーク化してから 4択を作る
+        const allValues = Array.from(
+          new Set(
+            BEANS
+              .map((b) => b[attr])
+              .filter((v) => v && String(v).trim() !== "")
+              .map((v) => String(v).trim())
+          )
+        );
+        const others = allValues.filter((v) => v !== correctValue);
+        const wrong = shuffle(others).slice(0, 3);
+        choices = shuffle([correctValue, ...wrong]);
+      }
+
+      return {
+        coffeeName: bean.name,
+        attribute: attr,
+        questionText: QUESTION_TEMPLATES[attr](bean.name),
+        choices,
+        correctValue, // 判定はインデックスではなく「値」で行う
+      };
+    }
+
+    // ======== 画面制御 ========
+    function updateStats() {
+      if (totalCount === 0) {
+        statsEl.textContent = "まだ解答履歴はありません。";
+        return;
+      }
+      const rate = ((correctCount / totalCount) * 100).toFixed(1);
+      statsEl.textContent = `正解数: ${correctCount} / ${totalCount}（正答率 ${rate}%）`;
+    }
+
+    function renderQuestion() {
+      if (!currentQuestion) return;
+
+      questionTextEl.textContent = currentQuestion.questionText;
+      coffeeNameEl.textContent = `コーヒー名：${currentQuestion.coffeeName}`;
+      resultEl.textContent = "";
+      resultEl.className = "result";
+
+      choicesEl.innerHTML = "";
+      currentQuestion.choices.forEach((choice, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = String.fromCharCode(65 + idx) + ". " + choice;
+        btn.dataset.value = choice; // 値で正誤判定するために保存
+        btn.addEventListener("click", () => handleChoiceClick(idx));
+        choicesEl.appendChild(btn);
+      });
+    }
+
+    function handleChoiceClick(index) {
+      if (answered || !currentQuestion) return;
+      answered = true;
+      totalCount++;
+
+      const clickedValue = currentQuestion.choices[index];
+      const isCorrect = clickedValue === currentQuestion.correctValue;
+
+      const buttons = choicesEl.querySelectorAll("button");
+      buttons.forEach((btn, idx) => {
+        btn.disabled = true;
+        const value = btn.dataset.value;
+
+        // 正解の値と一致するボタンは全部「correct」
+        if (value === currentQuestion.correctValue) {
+          btn.classList.add("correct");
+        }
+        // 押したボタンで、かつ正解値と違うものだけ「wrong」
+        if (idx === index && !isCorrect) {
+          btn.classList.add("wrong");
+        }
+      });
+
+      if (isCorrect) {
+        correctCount++;
+        resultEl.textContent = "✅ 正解！";
+        resultEl.classList.add("correct");
+      } else {
+        resultEl.textContent =
+          "❌ 不正解… 正解は「" + currentQuestion.correctValue + "」でした。";
+        resultEl.classList.add("wrong");
+      }
+
+      updateStats();
+    }
+
+    function newQuestion() {
+      if (!BEANS || BEANS.length === 0) return;
+      const value = attrSelect.value;
+      const attr = value === "random" ? null : value;
+      currentQuestion = generateQuestion(attr);
+      answered = false;
+      renderQuestion();
+    }
+
+    nextBtn.addEventListener("click", () => {
+      newQuestion();
+    });
+
+    attrSelect.addEventListener("change", () => {
+      newQuestion();
+    });
+
+    // 初期表示
+    updateStats();
+    newQuestion();
+  </script>
+</body>
+</html>
