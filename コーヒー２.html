@@ -114,16 +114,13 @@
   </style>
 </head>
 <body>
-  <div class="subtitle">
-    （地域 / 加工法 / キーワード / コク酸味 / ペアリング / ロースト）
-  </div>
 
   <div class="stats" id="stats"></div>
 
   <div class="top-controls">
     出題する項目：
     <select id="attribute-select">
-      <option value="random">ランダム</option>
+      <option value="random">すべて</option>
       <option value="region">地域</option>
       <option value="process">加工法</option>
       <option value="keywords">キーワード</option>
@@ -144,7 +141,6 @@
 
   <div class="card">
     <h2 class="question-title" id="question-text"></h2>
-    <div class="coffee-name" id="coffee-name"></div>
     <div class="choices" id="choices"></div>
     <div class="result" id="result"></div>
   </div>
@@ -154,7 +150,7 @@
   </div>
 
   <script>
-    // ここに CSV の中身を JS 配列として直接書く
+    // ======== ここに CSV の中身を JS 配列として直接書く ========
     // CSV の列順：
     // 0: コーヒー名, 1: 地域, 2: 加工法, 3: キーワード,
     // 4: コク/酸味, 5: 相性のいい風味, 6: ロースト
@@ -503,15 +499,14 @@ const PICKUP_BEAN_NAMES = new Set([
 
     const QUESTION_TEMPLATES = {
       region: (name) => `${name} の生産地域は？`,
-      process: (name) => `${name} の加工法は？`,
+      process: (name) => `${name} の主な加工法は？`,
       keywords: (name) => `${name} のキーワード（テイスティングノート）は？`,
-      body_acidity: (name) => `${name} のコク/酸味は？`,
+      body_acidity: (name) => `${name} のコク/酸味バランスは？`,
       pairing: (name) => `${name} と相性のいい風味は？`,
       roast: (name) => `${name} のローストレベルは？`,
     };
 
     const questionTextEl = document.getElementById("question-text");
-    const coffeeNameEl = document.getElementById("coffee-name");
     const choicesEl = document.getElementById("choices");
     const resultEl = document.getElementById("result");
     const nextBtn = document.getElementById("next-btn");
@@ -664,7 +659,6 @@ function getNextBean(attr, pool) {
       if (!currentQuestion) return;
 
       questionTextEl.textContent = currentQuestion.questionText;
-      coffeeNameEl.textContent = `コーヒー名：${currentQuestion.coffeeName}`;
       resultEl.textContent = "";
       resultEl.className = "result";
 
