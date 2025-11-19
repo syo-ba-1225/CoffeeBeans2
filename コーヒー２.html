@@ -154,7 +154,7 @@
   </div>
 
   <script>
-    // ======== ここに CSV の中身を JS 配列として直接書く ========
+    // ここに CSV の中身を JS 配列として直接書く
     // CSV の列順：
     // 0: コーヒー名, 1: 地域, 2: 加工法, 3: キーワード,
     // 4: コク/酸味, 5: 相性のいい風味, 6: ロースト
@@ -503,9 +503,9 @@ const PICKUP_BEAN_NAMES = new Set([
 
     const QUESTION_TEMPLATES = {
       region: (name) => `${name} の生産地域は？`,
-      process: (name) => `${name} の主な加工法は？`,
+      process: (name) => `${name} の加工法は？`,
       keywords: (name) => `${name} のキーワード（テイスティングノート）は？`,
-      body_acidity: (name) => `${name} のコク/酸味バランスは？`,
+      body_acidity: (name) => `${name} のコク/酸味は？`,
       pairing: (name) => `${name} と相性のいい風味は？`,
       roast: (name) => `${name} のローストレベルは？`,
     };
