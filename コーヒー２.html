@@ -132,6 +132,15 @@
       <option value="roast">ローストレベル</option>
     </select>
   </div>
+  <div class="top-controls">
+  出題する豆：
+  <select id="bean-filter">
+    <option value="all">すべて</option>
+    <option value="pickup">今年の試験ピックアップ</option>
+    <option value="other">それ以外</option>
+  </select>
+</div>
+
 
   <div class="card">
     <h2 class="question-title" id="question-text"></h2>
@@ -467,6 +476,30 @@
       "pairing",
       "roast",
     ];
+    // 今年の試験ピックアップ豆（名前は BEANS の name と完全一致させる）
+const PICKUP_BEAN_NAMES = new Set([
+  "TOKYOロースト",
+  "スマトラ",
+  "コモドドラゴンブレンド",
+  "カフェベロナ",
+  "グアテマラカシシエロ",
+  "エイジドスマトラ",
+  "スプリングシーズンブレンド",
+  "トリビュートブレンド",
+  "サンドライドタンザニアトゥンダ",
+  "アイスコーヒーブレンド",
+  "コロンビアナリニョ",
+  "カティカティブレンド",
+  "ティモール　レステエルメラ", // ← 全角スペースもCSVと同じに
+  "ボヤージュブレンド",
+  "オータムブレンド",
+  "アニバーサリーブレンド",
+  "スマトラドゥアカリ",
+  "クリスマスブレンド",
+  "クリスマスブレンドブロンドロースト",
+  "クリスマスブレンドエスプレッソロースト",
+]);
+
 
     const QUESTION_TEMPLATES = {
       region: (name) => `${name} の生産地域は？`,
@@ -484,11 +517,14 @@
     const nextBtn = document.getElementById("next-btn");
     const attrSelect = document.getElementById("attribute-select");
     const statsEl = document.getElementById("stats");
+    const beanFilterSelect = document.getElementById("bean-filter");
 
     let currentQuestion = null;
     let answered = false;
     let correctCount = 0;
     let totalCount = 0;
+    let beanOrder = [];
+    let beanOrderIndex = 0;
 
     // ======== ユーティリティ ========
     function shuffle(array) {
@@ -500,67 +536,119 @@
       return arr;
     }
 
+    // 現在のフィルタに合うプールに合わせて、順番配列を用意
+function ensureBeanOrder(pool) {
+  if (!pool.length) {
+    throw new Error("出題対象の豆がありません");
+  }
+
+  // プールが変わったり、まだ順番がないときは作り直し
+  if (
+    !beanOrder.length ||
+    beanOrder.length !== pool.length ||
+    !beanOrder.every((b) => pool.includes(b))
+  ) {
+    beanOrder = shuffle(pool.slice());
+    beanOrderIndex = 0;
+  }
+}
+
+// 次に出題する豆を 1つ取り出す（全豆使い切ったら順番をシャッフルして再スタート）
+function getNextBean(attr, pool) {
+  ensureBeanOrder(pool);
+
+  const maxTries = pool.length * 2;
+  let tries = 0;
+
+  while (tries < maxTries) {
+    // 1周使い切ったら、順番をシャッフルしてまた先頭から
+    if (beanOrderIndex >= beanOrder.length) {
+      beanOrder = shuffle(beanOrder);
+      beanOrderIndex = 0;
+    }
+
+    const bean = beanOrder[beanOrderIndex];
+    beanOrderIndex++;
+
+    const value = bean[attr];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return bean;
+    }
+
+    tries++;
+  }
+
+  // 念のためのフォールバック（基本ここには来ない想定）
+  return randomChoice(pool);
+}
+
+
     function randomChoice(array) {
       return array[Math.floor(Math.random() * array.length)];
     }
 
+    function getBeanPool() {
+      const filter = beanFilterSelect ? beanFilterSelect.value : "all";
+  if (filter === "pickup") {
+    return BEANS.filter((b) => PICKUP_BEAN_NAMES.has(b.name));
+  }
+  if (filter === "other") {
+    return BEANS.filter((b) => !PICKUP_BEAN_NAMES.has(b.name));
+  }
+  return BEANS.slice(); // all
+}
     // ======== 問題生成ロジック ========
     function generateQuestion(attribute) {
-      if (!BEANS || BEANS.length === 0) {
-        throw new Error("BEANS が空です。CSV 由来のデータを BEANS に追加してください。");
-      }
+  const attr = attribute || randomChoice(ATTRIBUTE_KEYS);
 
-      const attr = attribute || randomChoice(ATTRIBUTE_KEYS);
+  const pool = getBeanPool();
+  if (!pool.length) {
+    throw new Error("出題対象の豆がありません");
+  }
 
-      const candidates = BEANS.filter((b) => {
-        const value = b[attr];
-        return value !== undefined && value !== null && String(value).trim() !== "";
-      });
-      if (candidates.length === 0) {
-        throw new Error("属性 " + attr + " に対応する豆がありません。");
-      }
+  // 「全豆一周」ロジックで次の豆を取得
+  const bean = getNextBean(attr, pool);
+  const correctValue = String(bean[attr]).trim();
 
-      const bean = randomChoice(candidates);
-      const correctValue = String(bean[attr]).trim();
+  let choices;
+  if (attr === "roast") {
+    // ローストレベルは 3択固定（プール内のユニーク値から）
+    const allRoasts = Array.from(
+      new Set(
+        pool
+          .map((b) => b.roast)
+          .filter((v) => v && String(v).trim() !== "")
+          .map((v) => String(v).trim())
+      )
+    );
+    const others = allRoasts.filter((v) => v !== correctValue);
+    const wrong = shuffle(others).slice(0, 2);
+    choices = shuffle([correctValue, ...wrong]);
+  } else {
+    // 地域 / 加工法 / キーワード / コク酸味 / ペアリング
+    // → 現在のプールの中でユニークにしてから 4択
+    const allValues = Array.from(
+      new Set(
+        pool
+          .map((b) => b[attr])
+          .filter((v) => v && String(v).trim() !== "")
+          .map((v) => String(v).trim())
+      )
+    );
+    const others = allValues.filter((v) => v !== correctValue);
+    const wrong = shuffle(others).slice(0, 3);
+    choices = shuffle([correctValue, ...wrong]);
+  }
 
-      let choices;
-      if (attr === "roast") {
-        // ローストレベルは 3択固定（BLONDE / MEDIUM / DARK のユニーク値）
-        const allRoasts = Array.from(
-          new Set(
-            BEANS
-              .map((b) => b.roast)
-              .filter((v) => v && String(v).trim() !== "")
-              .map((v) => String(v).trim())
-          )
-        );
-        const others = allRoasts.filter((v) => v !== correctValue);
-        const wrong = shuffle(others).slice(0, 2);
-        choices = shuffle([correctValue, ...wrong]);
-      } else {
-        // 地域 / 加工法 / キーワード / コク酸味 / ペアリング
-        // → 値ベースでユニーク化してから 4択を作る
-        const allValues = Array.from(
-          new Set(
-            BEANS
-              .map((b) => b[attr])
-              .filter((v) => v && String(v).trim() !== "")
-              .map((v) => String(v).trim())
-          )
-        );
-        const others = allValues.filter((v) => v !== correctValue);
-        const wrong = shuffle(others).slice(0, 3);
-        choices = shuffle([correctValue, ...wrong]);
-      }
+  return {
+    coffeeName: bean.name,
+    attribute: attr,
+    questionText: QUESTION_TEMPLATES[attr](bean.name),
+    choices,
+    correctValue,
+  };
+}
 
-      return {
-        coffeeName: bean.name,
-        attribute: attr,
-        questionText: QUESTION_TEMPLATES[attr](bean.name),
-        choices,
-        correctValue, // 判定はインデックスではなく「値」で行う
-      };
-    }
 
     // ======== 画面制御 ========
     function updateStats() {
@@ -642,6 +730,14 @@
     attrSelect.addEventListener("change", () => {
       newQuestion();
     });
+    if (beanFilterSelect) {
+      beanFilterSelect.addEventListener("change", () => {
+        // フィルタが変わったら出題順をリセットして新しいプールで一周開始
+        beanOrder = [];
+        beanOrderIndex = 0;
+        newQuestion();
+      });
+    }
 
     // 初期表示
     updateStats();
